@@ -911,8 +911,47 @@ void Fog::volumetric_fog_update(const VolumetricFogSettings &p_settings, const P
 		}
 		{
 			RD::Uniform u;
-			u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
 			u.binding = 15;
+			u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
+			RID decal_atlas = texture_storage->decal_atlas_get_texture_srgb();
+			u.append_id(decal_atlas);
+			uniforms.push_back(u);
+		}
+    {
+      RD::Uniform u;
+      u.binding = 16;
+      u.uniform_type = RD::UNIFORM_TYPE_SAMPLER;
+      RID sampler;
+      const MaterialStorage::Samplers &p_samplers = MaterialStorage::get_singleton()->samplers_rd_get_default();
+      const RendererSceneRenderRD *rs = RendererSceneRenderRD::get_singleton();
+      switch (rs->light_projectors_get_filter()) {
+        case RS::LIGHT_PROJECTOR_FILTER_NEAREST: {
+          sampler = p_samplers.get_sampler(RS::CANVAS_ITEM_TEXTURE_FILTER_NEAREST, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+        } break;
+        case RS::LIGHT_PROJECTOR_FILTER_LINEAR: {
+          sampler = p_samplers.get_sampler(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+        } break;
+        case RS::LIGHT_PROJECTOR_FILTER_NEAREST_MIPMAPS: {
+          sampler = p_samplers.get_sampler(RS::CANVAS_ITEM_TEXTURE_FILTER_NEAREST_WITH_MIPMAPS, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+        } break;
+        case RS::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS: {
+          sampler = p_samplers.get_sampler(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+        } break;
+        case RS::LIGHT_PROJECTOR_FILTER_NEAREST_MIPMAPS_ANISOTROPIC: {
+          sampler = p_samplers.get_sampler(RS::CANVAS_ITEM_TEXTURE_FILTER_NEAREST_WITH_MIPMAPS_ANISOTROPIC, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+        } break;
+        case RS::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC: {
+          sampler = p_samplers.get_sampler(RS::CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC, RS::CANVAS_ITEM_TEXTURE_REPEAT_DISABLED);
+        } break;
+		  }
+
+      u.append_id(sampler);
+      uniforms.push_back(u);
+    }
+		{
+			RD::Uniform u;
+			u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
+			u.binding = 17;
 			u.append_id(fog->prev_light_density_map);
 			uniforms.push_back(u);
 		}
@@ -923,7 +962,7 @@ void Fog::volumetric_fog_update(const VolumetricFogSettings &p_settings, const P
 #else
 			u.uniform_type = RD::UNIFORM_TYPE_IMAGE;
 #endif
-			u.binding = 16;
+			u.binding = 18;
 			u.append_id(fog->density_map);
 			uniforms.push_back(u);
 		}
@@ -934,7 +973,7 @@ void Fog::volumetric_fog_update(const VolumetricFogSettings &p_settings, const P
 #else
 			u.uniform_type = RD::UNIFORM_TYPE_IMAGE;
 #endif
-			u.binding = 17;
+			u.binding = 19;
 			u.append_id(fog->light_map);
 			uniforms.push_back(u);
 		}
@@ -946,7 +985,7 @@ void Fog::volumetric_fog_update(const VolumetricFogSettings &p_settings, const P
 #else
 			u.uniform_type = RD::UNIFORM_TYPE_IMAGE;
 #endif
-			u.binding = 18;
+			u.binding = 20;
 			u.append_id(fog->emissive_map);
 			uniforms.push_back(u);
 		}
@@ -954,7 +993,7 @@ void Fog::volumetric_fog_update(const VolumetricFogSettings &p_settings, const P
 		{
 			RD::Uniform u;
 			u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
-			u.binding = 19;
+			u.binding = 21;
 			RID radiance_texture = texture_storage->texture_rd_get_default(p_settings.is_using_radiance_cubemap_array ? RendererRD::TextureStorage::DEFAULT_RD_TEXTURE_CUBEMAP_ARRAY_BLACK : RendererRD::TextureStorage::DEFAULT_RD_TEXTURE_CUBEMAP_BLACK);
 			RID sky_texture = RendererSceneRenderRD::get_singleton()->environment_get_sky(p_settings.env).is_valid() ? p_settings.sky->sky_get_radiance_texture_rd(RendererSceneRenderRD::get_singleton()->environment_get_sky(p_settings.env)) : RID();
 			u.append_id(sky_texture.is_valid() ? sky_texture : radiance_texture);
