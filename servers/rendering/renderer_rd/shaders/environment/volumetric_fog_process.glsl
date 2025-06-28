@@ -183,28 +183,30 @@ layout(set = 0, binding = 14, std140) uniform Params {
 }
 params;
 #ifndef MODE_COPY
-layout(set = 0, binding = 15) uniform texture3D prev_density_texture;
+layout(set = 0, binding = 15) uniform texture2D decal_atlas_srgb;
+layout(set = 0, binding = 16) uniform sampler light_projector_sampler;
+layout(set = 0, binding = 17) uniform texture3D prev_density_texture;
 
 #ifdef NO_IMAGE_ATOMICS
-layout(set = 0, binding = 16) buffer density_only_map_buffer {
+layout(set = 0, binding = 18) buffer density_only_map_buffer {
 	uint density_only_map[];
 };
-layout(set = 0, binding = 17) buffer light_only_map_buffer {
+layout(set = 0, binding = 19) buffer light_only_map_buffer {
 	uint light_only_map[];
 };
-layout(set = 0, binding = 18) buffer emissive_only_map_buffer {
+layout(set = 0, binding = 20) buffer emissive_only_map_buffer {
 	uint emissive_only_map[];
 };
 #else
-layout(r32ui, set = 0, binding = 16) uniform uimage3D density_only_map;
-layout(r32ui, set = 0, binding = 17) uniform uimage3D light_only_map;
-layout(r32ui, set = 0, binding = 18) uniform uimage3D emissive_only_map;
+layout(r32ui, set = 0, binding = 18) uniform uimage3D density_only_map;
+layout(r32ui, set = 0, binding = 19) uniform uimage3D light_only_map;
+layout(r32ui, set = 0, binding = 20) uniform uimage3D emissive_only_map;
 #endif
 
 #ifdef USE_RADIANCE_CUBEMAP_ARRAY
-layout(set = 0, binding = 19) uniform textureCubeArray sky_texture;
+layout(set = 0, binding = 21) uniform textureCubeArray sky_texture;
 #else
-layout(set = 0, binding = 19) uniform textureCube sky_texture;
+layout(set = 0, binding = 21) uniform textureCube sky_texture;
 #endif
 #endif // MODE_COPY
 
@@ -566,8 +568,21 @@ void main() {
 
 							float depth = texture(sampler2D(shadow_atlas, linear_sampler), pos.xy).r;
 
-							shadow_attenuation = mix(1.0 - spot_lights.data[light_index].shadow_opacity, 1.0, exp(min(0.0, (pos.z - depth)) / spot_lights.data[light_index].inv_radius * INV_FOG_FADE));
-						}
+						  shadow_attenuation = mix(1.0 - spot_lights.data[light_index].shadow_opacity, 1.0, exp(min(0.0, (pos.z - depth)) / spot_lights.data[light_index].inv_radius * INV_FOG_FADE));
+
+              // TODO: Add mipmap suport?
+              if (spot_lights.data[light_index].projector_rect != vec4(0.0)) {
+                vec4 projector_splane = (spot_lights.data[light_index].shadow_matrix * v);
+                splane.z -= spot_lights.data[light_index].shadow_bias / (d * spot_lights.data[light_index].inv_radius);
+                projector_splane /= projector_splane.w;
+
+                vec2 proj_uv = projector_splane.xy * spot_lights.data[light_index].projector_rect.zw;
+                vec2 uv = proj_uv + spot_lights.data[light_index].projector_rect.xy;
+
+                vec4 proj = textureLod(sampler2D(decal_atlas_srgb, light_projector_sampler), proj_uv + spot_lights.data[light_index].projector_rect.xy, 0.0);
+                light *= proj.rgb * proj.a;
+              }
+            }
 						total_light += light * attenuation * shadow_attenuation * henyey_greenstein(dot(normalize(light_rel_vec), normalize(view_pos)), params.phase_g) * spot_lights.data[light_index].volumetric_fog_energy;
 					}
 				}
